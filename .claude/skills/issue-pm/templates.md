@@ -17,7 +17,7 @@
 - [ ] `npm run test:run` が通る
 - [ ] カバレッジ 80% 以上
 - [ ] `npx tsc --noEmit` エラーなし
-- [ ] `/classly-review` チェックリスト通過
+- [ ] `/project-review` チェックリスト通過
 - [ ] PR がマージされた
 
 ## 参考
@@ -39,7 +39,7 @@ Closes #ISSUE_NUMBER
 - [ ] カバレッジ 80% 以上確認済み
 
 ## レビューチェック
-- [ ] `/classly-review` 通過
+- [ ] `/project-review` 通過
 - [ ] デザイントークン使用（ハードコード色なし）
 - [ ] 絵文字・禁止用語なし
 

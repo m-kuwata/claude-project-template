@@ -1,6 +1,6 @@
 ---
 name: new-screen
-description: classly の新規画面（App Router ページ）を正しいレイアウト構成でスキャフォールドする。
+description: 新規画面（App Router ページ）を正しいレイアウト構成でスキャフォールドする。
 when_to_use: 新しい画面やページを追加するとき、App Router のルートを新規作成するとき。
 argument-hint: "[ScreenName] [/route]"
 disable-model-invocation: true

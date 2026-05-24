@@ -73,7 +73,7 @@
 
 1. テストを先に書く（RED）→ 実装（GREEN）→ リファクタ（REFACTOR）
 2. コミット前に `npm run test:coverage` を実行し、カバレッジ **80% 以上**を確認
-3. コミット前に `/[project]-review` スキルで規約違反チェックを必ず行う
+3. コミット前に `/project-review` スキルで規約違反チェックを必ず行う
 
 詳細: `.claude/skills/tdd/SKILL.md`
 
@@ -84,6 +84,8 @@
 | `issue-pm` | Issue 駆動開発 PM（issue 作成・ブランチ・PR 管理） |
 | `issue-progress` | GitHub Projects 進捗管理 |
 | `tdd` | TDD ワークフロー（Red→Green→Refactor） |
+| `project-review` | コミット前チェックリスト（テスト・型・デザイン・セキュリティ） |
+| `design-system` | デザインシステム規約クイックリファレンス |
 | `coverage-check` | カバレッジ確認・未テストパスへのテスト追加 |
 | `config-audit` | Claude 設定ファイルの健全性チェック |
 | [追加スキル] | [用途] |
