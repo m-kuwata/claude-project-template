@@ -1,0 +1,13 @@
+{
+  "_comment": "GitHub Projects v2 の解決済み ID キャッシュ。`/issue-progress setup` で再生成する。",
+  "owner": "REPLACE_WITH_OWNER",
+  "projectNumber": 0,
+  "projectId": "REPLACE_WITH_PROJECT_ID",
+  "statusFieldId": "REPLACE_WITH_FIELD_ID",
+  "statusOptions": {
+    "未着手": "REPLACE_WITH_OPTION_ID",
+    "作業中": "REPLACE_WITH_OPTION_ID",
+    "レビュー中": "REPLACE_WITH_OPTION_ID",
+    "完了": "REPLACE_WITH_OPTION_ID"
+  }
+}
