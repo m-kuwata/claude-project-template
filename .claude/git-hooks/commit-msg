@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# git commit-msg hook: issue ブランチでは #N が必要
+set -uo pipefail
+
+msg_file="$1"
+msg=$(cat "$msg_file")
+
+# Merge / Revert / fixup は除外
+if echo "$msg" | grep -qE "^(Merge |Revert |fixup! |squash! )"; then exit 0; fi
+
+# 環境変数で一時スキップ可能（緊急修正時）
+if [[ "${SKIP_ISSUE_CHECK:-}" == "1" ]]; then exit 0; fi
+
+branch=$(git branch --show-current 2>/dev/null || echo "")
+issue_branch_pattern="^(feat|fix|refactor|chore|docs|test)/[0-9]+-"
+
+# issue ブランチ以外はスキップ
+if ! echo "$branch" | grep -qE "$issue_branch_pattern"; then exit 0; fi
+
+# #N が含まれているか検証
+if ! echo "$msg" | grep -qE '#[0-9]+'; then
+  echo "❌ コミットブロック: issue ブランチ (${branch}) では #N が必要です。" >&2
+  echo "   例: 'Closes #42' または '#42' をメッセージに含めてください。" >&2
+  exit 1
+fi
+
+exit 0
