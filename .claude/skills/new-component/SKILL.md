@@ -1,20 +1,20 @@
 ---
 name: new-component
-description: classly の新規コンポーネントをスキャフォールドする。コンポーネント本体・テスト・Storybook ストーリーを同時生成する。
-when_to_use: 新しい UI コンポーネントを作成するとき、classly/ 配下に新しいコンポーネントを追加するとき。
+description: 新規コンポーネントをスキャフォールドする。コンポーネント本体・テスト・Storybook ストーリーを同時生成する。
+when_to_use: 新しい UI コンポーネントを作成するとき、src/components/ 配下に新しいコンポーネントを追加するとき。
 argument-hint: "[ComponentName]"
 disable-model-invocation: true
-allowed-tools: Write Read Bash(find src/components/classly *)
+allowed-tools: Write Read Bash(find src/components *)
 ---
 
 # new-component スキル
 
-`src/components/classly/$ARGUMENTS/` に以下を生成する。
+`src/components/$ARGUMENTS/` に以下を生成する。
 
 ## 生成するファイル
 
 ```
-src/components/classly/$ARGUMENTS/
+src/components/$ARGUMENTS/
 ├── $ARGUMENTS.tsx
 ├── $ARGUMENTS.test.tsx     Vitest + RTL（TDD: テストを先に書く）
 └── $ARGUMENTS.stories.tsx  Storybook ストーリー
@@ -66,7 +66,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { $ARGUMENTS } from "./$ARGUMENTS";
 
 const meta: Meta<typeof $ARGUMENTS> = {
-  title: "classly/$ARGUMENTS",
+  title: "$ARGUMENTS",
   component: $ARGUMENTS,
   tags: ["autodocs"],
   parameters: { backgrounds: { default: "page" } },
@@ -81,7 +81,7 @@ export const Default: Story = {};
 ## チェックリスト
 
 - [ ] テストを先に書いた（RED → GREEN の順）
-- [ ] デザイン規約準拠（`/classly-design` スキル参照）
+- [ ] デザイン規約準拠（`/design-system` スキル参照）
 - [ ] `cn()` で className マージ
 - [ ] Lucide アイコン使用（絵文字禁止）
 - [ ] `npm run test:coverage` でカバレッジ 80% 以上

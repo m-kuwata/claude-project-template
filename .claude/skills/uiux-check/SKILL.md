@@ -1,6 +1,6 @@
 ---
 name: uiux-check
-description: classly の UI/UX を Playwright で実画面ベースに検査する。LP・テンプレート一覧・テンプレート詳細（全タブ）・収集フォーム・ヘルプを Desktop/Mobile で巡回し、Fold 内 CTA・エラー表示・確認ダイアログセa11y・コピーの規約違反を検出する。
+description: UI/UX を Playwright で実画面ベースに検査する。主要画面を Desktop/Mobile で巡回し、Fold 内 CTA・エラー表示・確認ダイアログ a11y・コピーの規約違反を検出する。
 when_to_use: UI 変更後の最終確認、PR 作成前の UX 観点レビュー、新画面追加時。
 allowed-tools: Bash(npm run dev*) Bash(node scripts/*) Bash(npx playwright*) Bash(curl*) Bash(grep *) Bash(kill *) Read
 ---

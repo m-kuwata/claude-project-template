@@ -1,6 +1,6 @@
 ---
 name: config-audit
-description: classly の Claude Code 設定ファイル群（CLAUDE.md・skills・hooks・settings.json）の健全性を定期チェックする。設定ドリフトを検出し、修正案を提示する。
+description: Claude Code 設定ファイル群（CLAUDE.md・skills・hooks・settings.json）の健全性を定期チェックする。設定ドリフトを検出し、修正案を提示する。
 disable-model-invocation: true
 allowed-tools: Bash(bash scripts/config-audit.sh) Bash(git *) Read
 ---

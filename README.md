@@ -1,6 +1,6 @@
 # Claude Code プロジェクト設定テンプレート
 
-[classly](https://github.com/m-kuwata/classly) プロジェクトで実際に運用している Claude Code 設定ファイル一式を、新規プロジェクトへ持ち込むためのテンプレートリポジトリ。
+新規プロジェクトへ Claude Code の設定ファイル一式を持ち込むためのテンプレートリポジトリ。
 
 ## このテンプレートで実現できること
 
@@ -21,18 +21,18 @@
 ├── README.md
 ├── CLAUDE.md                              Claude が最初に読むプロジェクトコンテキスト
 └── .claude/
-    ├── settings.json                      Claude Code 設定（権限・フック定義）
+    ├── settings.json                      Claude Code 設定（権限・フック定義・PROJECT_NAME）
     ├── git-hooks/
     │   └── commit-msg                     コミットメッセージ検証（issue 番号必須化）
     ├── hooks/                             Claude Code フック群
     │   ├── session-start.sh               SessionStart: 共通セットアップ
     │   ├── pre-commit-check.sh            PreToolUse(Bash): コミット前品質ゲート
     │   ├── pre-edit-tdd-guard.sh          PreToolUse(Edit|Write): TDD RED フェーズ強制
-    │   ├── post-edit-lint.sh              PostToolUse: ESLint + ruff 早期実行
+    │   ├── post-edit-lint.sh              PostToolUse: ESLint 早期実行
     │   ├── set-impl-flag.sh               PostToolUse: 実装ファイル変更フラグ
     │   ├── set-screen-flag.sh             PostToolUse: 画面ファイル変更フラグ
     │   ├── set-screenshot-flag.sh         PostToolUse: レイアウト変更フラグ
-    │   ├── auto-classly-review.sh         Stop: コードレビュースキル実行強制
+    │   ├── auto-review.sh                 Stop: コードレビュースキル実行強制
     │   ├── auto-design-check.sh           Stop: デザインチェックスキル実行強制
     │   ├── auto-screenshot-check.sh       Stop: スクリーンショット確認強制
     │   ├── pre-compact-backup.sh          PreCompact: コンテキスト圧縮前バックアップ
@@ -41,8 +41,8 @@
         ├── tdd/                           TDD ワークフロー
         │   ├── SKILL.md
         │   └── examples.md
-        ├── classly-review/SKILL.md        コミット前チェックリスト
-        ├── classly-design/SKILL.md        デザインシステム準拠
+        ├── project-review/SKILL.md        コミット前チェックリスト
+        ├── design-system/SKILL.md         デザインシステム規約
         ├── issue-pm/                      Issue 駆動開発 PM
         │   ├── SKILL.md
         │   └── templates.md
@@ -70,6 +70,7 @@ Claude がセッション開始時に最初に読むファイル。プロジェ�
 
 Claude Code の設定ファイル。以下を定義する。
 
+- `env.PROJECT_NAME` — **プロジェクト名（フックのフラグファイル名に使用）。必ず変更すること**
 - `permissions.allow` — 確認なしで実行できるコマンド（git, npm, gh など）
 - `permissions.deny` — 常にブロックするコマンド（force push, rm -rf など）
 - `hooks` — Claude のライフサイクルイベントに紐付くフックスクリプトの登録
@@ -87,11 +88,11 @@ Issue ブランチ（`feat/N-*`, `fix/N-*` 等）でのコミット時に、メ�
 | `session-start.sh` | SessionStart | npm install・git hook 設定・Playwright ブラウザセットアップ |
 | `pre-commit-check.sh` | PreToolUse(Bash) | git commit 前にテスト・型チェック・カバレッジを実行してブロック |
 | `pre-edit-tdd-guard.sh` | PreToolUse(Edit\|Write) | `src/lib/` / `src/features/` 編集前に対応テストの存在を確認 |
-| `post-edit-lint.sh` | PostToolUse | ファイル保存後に ESLint / ruff を実行して早期エラー検出 |
-| `set-impl-flag.sh` | PostToolUse | 実装ファイル変更時に `/tmp/classly-needs-review` フラグを立てる |
-| `set-screen-flag.sh` | PostToolUse | 画面ファイル変更時に `/tmp/classly-needs-design-check` フラグを立てる |
-| `set-screenshot-flag.sh` | PostToolUse | レイアウトファイル変更時に `/tmp/classly-needs-screenshot-check` フラグを立てる |
-| `auto-classly-review.sh` | Stop | フラグを検知してコードレビュースキルの実行を強制 |
+| `post-edit-lint.sh` | PostToolUse | ファイル保存後に ESLint を実行して早期エラー検出 |
+| `set-impl-flag.sh` | PostToolUse | 実装ファイル変更時に `/tmp/$PROJECT_NAME-needs-review` フラグを立てる |
+| `set-screen-flag.sh` | PostToolUse | 画面ファイル変更時に `/tmp/$PROJECT_NAME-needs-design-check` フラグを立てる |
+| `set-screenshot-flag.sh` | PostToolUse | レイアウトファイル変更時に `/tmp/$PROJECT_NAME-needs-screenshot-check` フラグを立てる |
+| `auto-review.sh` | Stop | フラグを検知してコードレビュースキルの実行を強制 |
 | `auto-design-check.sh` | Stop | フラグを検知してデザインチェックスキルの実行を強制 |
 | `auto-screenshot-check.sh` | Stop | フラグを検知してスクリーンショット確認を強制 |
 | `pre-compact-backup.sh` | PreCompact | コンテキスト圧縮前に git log と差分を `.claude/session-notes/` へ保存 |
@@ -100,10 +101,10 @@ Issue ブランチ（`feat/N-*`, `fix/N-*` 等）でのコミット時に、メ�
 **フラグベースの遅延チェックの仕組み**:
 
 ```
-[Edit/Write] → set-impl-flag.sh ─────────→ /tmp/classly-needs-review
-                                                        ↓
-[Stop] ←────────────── auto-classly-review.sh がフラグを検知してブロック
-         ↑ /classly-review スキル実行 + touch /tmp/classly-review-passed でブロック解除
+[Edit/Write] → set-impl-flag.sh ──────────→ /tmp/$PROJECT_NAME-needs-review
+                                                         ↓
+[Stop] ←────────────── auto-review.sh がフラグを検知してブロック
+         ↑ /project-review スキル実行 + touch /tmp/$PROJECT_NAME-review-passed でブロック解除
 ```
 
 ### .claude/skills/ — スキル群
@@ -113,8 +114,8 @@ Issue ブランチ（`feat/N-*`, `fix/N-*` 等）でのコミット時に、メ�
 | スキル | 用途 |
 |---|---|
 | `tdd` | TDD ワークフロー（Red→Green→Refactor） |
-| `classly-review` | コミット前チェックリスト（テスト・型・デザイン・セキュリティ） |
-| `classly-design` | デザインシステム規約クイックリファレンス |
+| `project-review` | コミット前チェックリスト（テスト・型・デザイン・セキュリティ） |
+| `design-system` | デザインシステム規約クイックリファレンス |
 | `issue-pm` | Issue 駆動開発 PM（issue 作成・ブランチ・PR 管理） |
 | `issue-progress` | GitHub Projects 進捗管理（ステータス更新・ボード表示） |
 | `design-check` | 画面変更後のデザインシステム規約スキャン |
@@ -125,7 +126,7 @@ Issue ブランチ（`feat/N-*`, `fix/N-*` 等）でのコミット時に、メ�
 | `storybook-check` | Storybook ストーリーカバレッジ確認・補完 |
 | `uiux-check` | Playwright による実画面 UI/UX 検査 |
 
-> **注**: スキルの内容はすべて classly プロジェクト固有。新しいプロジェクトでは内容を書き換えるか、不要なスキルは削除すること。
+> **注**: スキルの内容はプロジェクト固有の部分が多い。新しいプロジェクトでは内容を書き換えるか、不要なスキルは削除すること。
 
 ## 新規プロジェクトへのセットアップ手順
 
@@ -148,7 +149,21 @@ chmod +x .claude/hooks/*.sh
 chmod +x .claude/git-hooks/commit-msg
 ```
 
-### Step 3: CLAUDE.md を書く
+### Step 3: PROJECT_NAME を設定する
+
+**最初に必ず行う。** `.claude/settings.json` の `env.PROJECT_NAME` をプロジェクト名に変更する。
+
+```json
+{
+  "env": {
+    "PROJECT_NAME": "your-project-name"
+  }
+}
+```
+
+フラグファイル（`/tmp/$PROJECT_NAME-needs-review` 等）の名前空間として使われる。
+
+### Step 4: CLAUDE.md を書く
 
 `CLAUDE.md` をプロジェクト固有の内容に書き換える。最低限以下を記載すること。
 
@@ -158,38 +173,38 @@ chmod +x .claude/git-hooks/commit-msg
 - 開発ルール（TDD・Issue 駆動開発など）
 - 使用するスキルの一覧
 
-### Step 4: settings.json をカスタマイズする
+### Step 5: settings.json をカスタマイズする
 
 `$CLAUDE_PROJECT_DIR` はそのまま使える。必要に応じて以下を調整する。
 
 - `permissions.allow` にプロジェクト固有のコマンドを追加（例: `Bash(python *)`, `Bash(docker *)`）
 - 使わないフックのエントリを削除
 
-### Step 5: フックをカスタマイズする
+### Step 6: フックをカスタマイズする
 
 **変更が必要なフック**:
 
 | フック | 変更点 |
 |---|---|
-| `pre-commit-check.sh` | テストコマンド・カバレッジ閾値。Python の `apps/solver-api/` 部分は不要なら削除 |
+| `pre-commit-check.sh` | テストコマンド・カバレッジ閾値 |
 | `pre-edit-tdd-guard.sh` | TDD 対象ディレクトリ（`src/lib/` / `src/features/` 以外を使う場合） |
-| `post-edit-lint.sh` | Lint コマンド（eslint / ruff 以外を使う場合） |
-| `set-screen-flag.sh` | 画面ファイルのパスパターン（classly 固有のパスを変更） |
+| `post-edit-lint.sh` | Lint コマンド（eslint 以外を使う場合） |
+| `set-screen-flag.sh` | 画面ファイルのパスパターン |
 | `set-screenshot-flag.sh` | スクリーンショットチェック対象のファイルパターン |
-| `auto-screenshot-check.sh` | スクリーンショット手順（使用する画面ルートを修正） |
-| `tdd-reminder.sh` | 実装キーワード・Python ソルバーの有無 |
+| `auto-screenshot-check.sh` | スクリーンショット手順（確認対象のルートを修正） |
+| `tdd-reminder.sh` | 実装キーワード |
 
 **汎用的でそのまま使えるフック**:
 - `session-start.sh`
 - `pre-compact-backup.sh`
-- `auto-classly-review.sh`（フラグのパスだけ確認）
+- `auto-review.sh`（フラグのパスだけ確認）
 - `auto-design-check.sh`
 
-### Step 6: スキルをカスタマイズする
+### Step 7: スキルをカスタマイズする
 
 **必ず書き換えるもの**:
-- `classly-review/SKILL.md` → プロジェクト固有のチェックリストに変更
-- `classly-design/SKILL.md` → プロジェクトのデザイントークン・規約に変更
+- `project-review/SKILL.md` → プロジェクト固有のチェックリストに変更
+- `design-system/SKILL.md` → プロジェクトのデザイントークン・規約に変更
 - `issue-progress/project-cache.json` → `/issue-progress setup` で再生成
 
 **内容を確認・調整すれば使えるもの**:
@@ -199,14 +214,14 @@ chmod +x .claude/git-hooks/commit-msg
 - `new-component/SKILL.md` → コンポーネント配置先パスを調整
 - `new-screen/SKILL.md` → 画面ルートとレイアウト構成を調整
 
-### Step 7: GitHub Projects のセットアップ（issue-progress スキルを使う場合）
+### Step 8: GitHub Projects のセットアップ（issue-progress スキルを使う場合）
 
 1. GitHub Projects v2 でプロジェクトを作成
 2. Status フィールドに `未着手` / `作業中` / `レビュー中` / `完了` のオプションを追加
 3. リポジトリ Settings > Secrets に `PROJECT_TOKEN` を設定（スコープ: `repo` + `project`）
 4. `/issue-progress setup` を実行して `project-cache.json` を再生成
 
-### Step 8: 動作確認
+### Step 9: 動作確認
 
 ```bash
 # フックが実行できるか確認
@@ -220,17 +235,16 @@ bash .claude/hooks/session-start.sh
 
 | 状況 | 変更するファイル |
 |---|---|
+| プロジェクト名を変える | `settings.json` の `env.PROJECT_NAME` |
 | テストコマンドが違う | `pre-commit-check.sh`, `tdd/SKILL.md`, `coverage-check/SKILL.md` |
 | カバレッジ閾値を変える | `pre-commit-check.sh`, `coverage-check/SKILL.md` |
-| Python バックエンドが不要 | `pre-commit-check.sh`, `post-edit-lint.sh`, `tdd-reminder.sh` から solver-api 記述を削除 |
 | TDD 対象ディレクトリが違う | `pre-edit-tdd-guard.sh` |
-| デザインシステムが違う | `set-screen-flag.sh`, `auto-design-check.sh`, `design-check/SKILL.md`, `classly-design/SKILL.md` |
+| デザインシステムが違う | `set-screen-flag.sh`, `auto-design-check.sh`, `design-check/SKILL.md`, `design-system/SKILL.md` |
 | Storybook を使わない | `storybook-check/` スキルと関連フラグを削除 |
 | GitHub Projects を使わない | `issue-progress/` スキルを削除 |
 | スキル名を変える | `SKILL.md` の `name:` フィールドと `auto-*.sh` のメッセージを変更 |
 
 ## 参考リンク
 
-- [classly — 実運用プロジェクト](https://github.com/m-kuwata/classly)（このテンプレートの出所）
 - [Claude Code ドキュメント](https://docs.anthropic.com/ja/docs/claude-code)
 - [Claude Code Hooks リファレンス](https://docs.anthropic.com/ja/docs/claude-code/hooks)

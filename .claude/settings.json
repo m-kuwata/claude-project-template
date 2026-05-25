@@ -1,4 +1,7 @@
 {
+  "env": {
+    "PROJECT_NAME": "myapp"
+  },
   "permissions": {
     "allow": [
       "Bash(gh *)",
@@ -135,7 +138,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/auto-classly-review.sh"
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/auto-review.sh"
           },
           {
             "type": "command",
