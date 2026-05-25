@@ -3,8 +3,9 @@
 # `/config-audit` スキルと CI（config-audit.yml）の双方から呼ぶ共通実装。
 #
 # 終了コード: 致命（FATAL）が 1 件以上で 1、それ以外は 0。
-# FATAL = フック実行不可/シバンなし、settings.json 不正、jq 未導入、
+# FATAL = シバン行なし、settings.json 不正、jq 未導入、
 #         スキルに name/description なし。
+# WARN  = フックの実行権限なし（GitHub API コミット時は 100644 になるため WARNに等限）。
 # WARN/INFO は表示のみ（CI を落とさない）。
 set -uo pipefail
 
@@ -36,7 +37,9 @@ done
 echo "=== チェック 2 — フック実行可能性 ==="
 for hook in .claude/hooks/*.sh; do
   [ -f "$hook" ] || continue
-  [ -x "$hook" ] || err "実行権限なし → $hook"
+  # GitHub API 経由のコミットは 100644 になるため実行権限は WARN。
+  # ローカルで使う際は chmod +x を実行すること。
+  [ -x "$hook" ] || wrn "実行権限なし（clone 後に chmod +x が必要）→ $hook"
   head -1 "$hook" | grep -q "^#!" || err "シバン行なし → $hook"
   if grep -q "jq" "$hook" && ! command -v jq &>/dev/null; then
     err "jq 未インストールだが $hook が jq を使用"
