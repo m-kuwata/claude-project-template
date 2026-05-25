@@ -1,0 +1,349 @@
+# PR イベントに連動して GitHub Projects のステータスを自動更新する
+#
+# 必要な準備:
+#   1. GitHub Projects v2 で以下のステータス値を作成:
+#      "未着手" / "作業中" / "レビュー中" / "完了"
+#   2. リポジトリ Settings > Secrets で PROJECT_TOKEN を設定
+#      (スコープ: repo + project)
+#   3. リポジトリ Settings > Variables で PROJECT_URL を設定
+#      (例: https://github.com/users/YOUR_USERNAME/projects/YOUR_PROJECT_NUMBER)
+
+name: Project Status Sync
+
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened, reopened, ready_for_review, converted_to_draft, closed]
+  push:
+    branches-ignore: [main]
+
+permissions:
+  contents: read
+
+env:
+  PROJECT_URL: ${{ vars.PROJECT_URL }}
+
+jobs:
+  sync-status:
+    runs-on: ubuntu-latest
+    if: ${{ secrets.PROJECT_TOKEN != '' }}
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      HAS_PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN != '' }}
+
+    steps:
+      - name: Issue オープン → プロジェクトに追加
+        if: ${{ env.HAS_PROJECT_TOKEN == 'true' && github.event_name == 'issues' && github.event.action == 'opened' }}
+        uses: actions/add-to-project@244f685bbc3b7adfa8466e08b698b5577571133e # v1.0.2
+        with:
+          project-url: ${{ env.PROJECT_URL }}
+          github-token: ${{ secrets.PROJECT_TOKEN }}
+          labeled: ""
+          label-operator: NOT
+
+      - name: フィーチャーブランチ push → 関連 Issue を「作業中」に
+        if: ${{ env.HAS_PROJECT_TOKEN == 'true' && github.event_name == 'push' }}
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          github-token: ${{ secrets.PROJECT_TOKEN }}
+          script: |
+            // issue 番号をブランチ名 (<type>/<N>-...) → なければ全コミットメッセージ (#N) から特定
+            const ref = (context.payload.ref || '').replace('refs/heads/', '');
+            let issueNumber = null;
+
+            // 1. ブランチ名から解析
+            const branchMatch = ref.match(/^[a-z]+\/(\d+)-/);
+            if (branchMatch) {
+              issueNumber = parseInt(branchMatch[1]);
+            }
+
+            // 2. 全コミットメッセージを走査して #N を探す
+            if (!issueNumber) {
+              const commits = context.payload.commits || [];
+              for (const commit of commits) {
+                const msg = commit.message || '';
+                const m = msg.match(/#(\d+)/);
+                if (m) {
+                  issueNumber = parseInt(m[1]);
+                  break;
+                }
+              }
+            }
+
+            if (!issueNumber) {
+              core.warning(`ブランチ名 '${ref}' / コミットに issue 番号がありません。作業中への遷移をスキップします。`);
+              return;
+            }
+
+            const projectUrl = process.env.PROJECT_URL;
+            const [, , , , login, , projectNumber] = projectUrl.split('/');
+
+            const projectData = await github.graphql(`
+              query($login: String!, $number: Int!) {
+                user(login: $login) {
+                  projectV2(number: $number) {
+                    id
+                    fields(first: 20) {
+                      nodes {
+                        ... on ProjectV2SingleSelectField { id name options { id name } }
+                      }
+                    }
+                  }
+                }
+              }
+            `, { login, number: parseInt(projectNumber) });
+
+            const project = projectData.user.projectV2;
+            const statusField = project.fields.nodes.find(f => f.name === 'Status');
+            const inProgress = statusField?.options.find(o => o.name === '作業中');
+            if (!statusField || !inProgress) {
+              core.warning('Status フィールド / "作業中" オプションが見つかりません。Projects の設定を確認してください。');
+              return;
+            }
+
+            // 現在のステータスを取得（レビュー中・完了・作業中なら降格しない）
+            const issueData = await github.graphql(`
+              query($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  issue(number: $number) {
+                    id
+                    projectItems(first: 10) {
+                      nodes {
+                        id
+                        project { id }
+                        fieldValueByName(name: "Status") {
+                          ... on ProjectV2ItemFieldSingleSelectValue { name }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `, { owner: context.repo.owner, repo: context.repo.repo, number: issueNumber });
+
+            const issue = issueData.repository.issue;
+            let item = issue.projectItems.nodes.find(n => n.project.id === project.id);
+
+            if (item) {
+              const cur = item.fieldValueByName?.name;
+              if (['作業中', 'レビュー中', '完了'].includes(cur)) {
+                console.log(`Issue #${issueNumber} は既に「${cur}」。降格しないためスキップします。`);
+                return;
+              }
+            } else {
+              const addResult = await github.graphql(`
+                mutation($projectId: ID!, $contentId: ID!) {
+                  addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) { item { id } }
+                }
+              `, { projectId: project.id, contentId: issue.id });
+              item = { id: addResult.addProjectV2ItemById.item.id };
+            }
+
+            await github.graphql(`
+              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                updateProjectV2ItemFieldValue(input: {
+                  projectId: $projectId
+                  itemId: $itemId
+                  fieldId: $fieldId
+                  value: { singleSelectOptionId: $optionId }
+                }) { projectV2Item { id } }
+              }
+            `, {
+              projectId: project.id,
+              itemId: item.id,
+              fieldId: statusField.id,
+              optionId: inProgress.id
+            });
+
+            console.log(`Issue #${issueNumber} を「作業中」に更新しました`);
+
+      - name: PR オープン → 関連 Issue を draft なら「作業中」/ それ以外「レビュー中」に
+        if: ${{ env.HAS_PROJECT_TOKEN == 'true' && github.event_name == 'pull_request' && github.event.action != 'closed' }}
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          github-token: ${{ secrets.PROJECT_TOKEN }}
+          script: |
+            const prBody = context.payload.pull_request.body || '';
+            const match = prBody.match(/Closes\s+#(\d+)/i);
+            if (!match) {
+              console.log('Closes #N が PR 本文に見つかりません。スキップします。');
+              return;
+            }
+            const issueNumber = parseInt(match[1]);
+            const targetStatus = context.payload.pull_request.draft ? '作業中' : 'レビュー中';
+            console.log(`Issue #${issueNumber} のステータスを「${targetStatus}」に更新します`);
+
+            const projectUrl = process.env.PROJECT_URL;
+            const [, , , , login, , projectNumber] = projectUrl.split('/');
+
+            // プロジェクト ID と Status フィールドを取得
+            const projectData = await github.graphql(`
+              query($login: String!, $number: Int!) {
+                user(login: $login) {
+                  projectV2(number: $number) {
+                    id
+                    fields(first: 20) {
+                      nodes {
+                        ... on ProjectV2SingleSelectField {
+                          id
+                          name
+                          options { id name }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `, { login, number: parseInt(projectNumber) });
+
+            const project = projectData.user.projectV2;
+            const statusField = project.fields.nodes.find(f => f.name === 'Status');
+            if (!statusField) {
+              console.log('Status フィールドが見つかりません');
+              return;
+            }
+            const reviewOption = statusField.options.find(o => o.name === targetStatus);
+            if (!reviewOption) {
+              console.log(`"${targetStatus}" オプションが見つかりません`);
+              return;
+            }
+
+            // issue の node ID を取得
+            const issueData = await github.graphql(`
+              query($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  issue(number: $number) { id }
+                }
+              }
+            `, { owner: context.repo.owner, repo: context.repo.repo, number: issueNumber });
+
+            const issueId = issueData.repository.issue.id;
+
+            // issue をプロジェクトに追加（既存なら既存アイテムを返す）
+            const addResult = await github.graphql(`
+              mutation($projectId: ID!, $contentId: ID!) {
+                addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
+                  item { id }
+                }
+              }
+            `, { projectId: project.id, contentId: issueId });
+
+            const itemId = addResult.addProjectV2ItemById.item.id;
+
+            // ステータスを更新
+            await github.graphql(`
+              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                updateProjectV2ItemFieldValue(input: {
+                  projectId: $projectId
+                  itemId: $itemId
+                  fieldId: $fieldId
+                  value: { singleSelectOptionId: $optionId }
+                }) { projectV2Item { id } }
+              }
+            `, {
+              projectId: project.id,
+              itemId,
+              fieldId: statusField.id,
+              optionId: reviewOption.id
+            });
+
+            console.log(`Issue #${issueNumber} を「${targetStatus}」に更新しました`);
+
+      - name: PR マージ → ステータスを「完了」に更新
+        if: ${{ env.HAS_PROJECT_TOKEN == 'true' && github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true }}
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          github-token: ${{ secrets.PROJECT_TOKEN }}
+          script: |
+            const prBody = context.payload.pull_request.body || '';
+
+            // PR 本文から "Closes #N" の issue 番号を抽出
+            const match = prBody.match(/Closes\s+#(\d+)/i);
+            if (!match) {
+              console.log('Closes #N が PR 本文に見つかりません。スキップします。');
+              return;
+            }
+            const issueNumber = parseInt(match[1]);
+            console.log(`Issue #${issueNumber} のステータスを「完了」に更新します`);
+
+            // GraphQL でプロジェクトアイテムを検索して Status を更新
+            const projectUrl = process.env.PROJECT_URL;
+            const [, , , , login, , projectNumber] = projectUrl.split('/');
+
+            // プロジェクト ID と Status フィールドを取得
+            const projectData = await github.graphql(`
+              query($login: String!, $number: Int!) {
+                user(login: $login) {
+                  projectV2(number: $number) {
+                    id
+                    fields(first: 20) {
+                      nodes {
+                        ... on ProjectV2SingleSelectField {
+                          id
+                          name
+                          options { id name }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `, { login, number: parseInt(projectNumber) });
+
+            const project = projectData.user.projectV2;
+            const statusField = project.fields.nodes.find(f => f.name === 'Status');
+            if (!statusField) {
+              console.log('Status フィールドが見つかりません');
+              return;
+            }
+            const doneOption = statusField.options.find(o => o.name === '完了');
+            if (!doneOption) {
+              console.log('"完了" オプションが見つかりません。Projects のステータス値を確認してください。');
+              return;
+            }
+
+            // issue に紐付くプロジェクトアイテムを検索
+            const issueData = await github.graphql(`
+              query($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  issue(number: $number) {
+                    projectItems(first: 10) {
+                      nodes { id project { id } }
+                    }
+                  }
+                }
+              }
+            `, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              number: issueNumber
+            });
+
+            const item = issueData.repository.issue.projectItems.nodes
+              .find(n => n.project.id === project.id);
+            if (!item) {
+              console.log(`Issue #${issueNumber} はプロジェクトに未追加です`);
+              return;
+            }
+
+            // ステータスを「完了」に更新
+            await github.graphql(`
+              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+                updateProjectV2ItemFieldValue(input: {
+                  projectId: $projectId
+                  itemId: $itemId
+                  fieldId: $fieldId
+                  value: { singleSelectOptionId: $optionId }
+                }) { projectV2Item { id } }
+              }
+            `, {
+              projectId: project.id,
+              itemId: item.id,
+              fieldId: statusField.id,
+              optionId: doneOption.id
+            });
+
+            console.log(`Issue #${issueNumber} を「完了」に更新しました`);
