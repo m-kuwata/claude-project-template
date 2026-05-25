@@ -1,0 +1,34 @@
+# Claude Code 設定（CLAUDE.md / .claude/skills / .claude/hooks / settings.json）の
+# ドリフトを常時検出する。ロジックは scripts/config-audit.sh に集約し、
+# /config-audit スキルと共通化している。
+name: Config Audit
+
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - 'CLAUDE.md'
+      - '.claude/**'
+      - 'scripts/config-audit.sh'
+      - '.github/workflows/config-audit.yml'
+  pull_request:
+    paths:
+      - 'CLAUDE.md'
+      - '.claude/**'
+      - 'scripts/config-audit.sh'
+      - '.github/workflows/config-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - name: jq を導入
+        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: config-audit を実行（FATAL があれば fail）
+        run: bash scripts/config-audit.sh

@@ -1,0 +1,62 @@
+name: solver-api CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/solver-api/**"
+      - "packages/solver-contracts/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/solver-api/**"
+      - "packages/solver-contracts/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: solver-api-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    # テスト/lint は ci.yml の test-python ジョブで実施済み
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write  # Workload Identity Federation に必要
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker asia-northeast1-docker.pkg.dev
+
+      - name: Build & push image
+        run: |
+          IMAGE=asia-northeast1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/solver-api/solver-api:${{ github.sha }}
+          docker build -t $IMAGE apps/solver-api
+          docker push $IMAGE
+
+      - uses: google-github-actions/deploy-cloudrun@251330ba9a8a34bfbc1622895f42e1d53fd14522 # v2
+        with:
+          service: ${{ github.event.repository.name }}-solver-api
+          region: asia-northeast1
+          image: asia-northeast1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/solver-api/solver-api:${{ github.sha }}
+          flags: "--allow-unauthenticated"
+          env_vars: |
+            SOLVE_TIMEOUT_MS=10000
+          secrets: |
+            SOLVER_API_KEY=SOLVER_API_KEY:latest
