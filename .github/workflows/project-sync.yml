@@ -37,7 +37,7 @@ jobs:
     steps:
       - name: Issue オープン → プロジェクトに追加
         if: ${{ env.HAS_PROJECT_TOKEN == 'true' && github.event_name == 'issues' && github.event.action == 'opened' }}
-        uses: actions/add-to-project@244f685bbc3b7adfa8466e08b698b5577571133e # v1.0.2
+        uses: actions/add-to-project@5afcf98fcd03f1c2f92c3c83f58ae24323cc57fd # v2.0.0
         with:
           project-url: ${{ env.PROJECT_URL }}
           github-token: ${{ secrets.PROJECT_TOKEN }}
@@ -46,7 +46,7 @@ jobs:
 
       - name: フィーチャーブランチ push → 関連 Issue を「作業中」に
         if: ${{ env.HAS_PROJECT_TOKEN == 'true' && github.event_name == 'push' }}
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ secrets.PROJECT_TOKEN }}
           script: |
@@ -162,7 +162,7 @@ jobs:
 
       - name: PR オープン → 関連 Issue を draft なら「作業中」/ それ以外「レビュー中」に
         if: ${{ env.HAS_PROJECT_TOKEN == 'true' && github.event_name == 'pull_request' && github.event.action != 'closed' }}
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ secrets.PROJECT_TOKEN }}
           script: |
@@ -254,7 +254,7 @@ jobs:
 
       - name: PR マージ → ステータスを「完了」に更新
         if: ${{ env.HAS_PROJECT_TOKEN == 'true' && github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true }}
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ secrets.PROJECT_TOKEN }}
           script: |
