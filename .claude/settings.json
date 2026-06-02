@@ -4,6 +4,7 @@
   },
   "permissions": {
     "allow": [
+      "Bash(bash $CLAUDE_PROJECT_DIR/.claude/hooks/mark-review-passed.sh *)",
       "Bash(gh *)",
       "Bash(git add *)",
       "Bash(git commit *)",
@@ -34,7 +35,12 @@
       "Bash(rm -rf /*)",
       "Bash(rm -rf ~*)",
       "Edit(**/.env*)",
-      "Write(**/.env*)"
+      "Write(**/.env*)",
+      "Bash(touch /tmp/*-project-review-passed*)",
+      "Bash(touch /tmp/*-qa-review-passed*)",
+      "Bash(touch /tmp/*-po-review-passed*)",
+      "Bash(touch /tmp/*-design-check-passed*)",
+      "Bash(touch /tmp/*-refactor-passed*)"
     ]
   },
   "hooks": {
@@ -63,7 +69,15 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/pre-edit-issue-guard.sh"
+          },
+          {
+            "type": "command",
             "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/pre-edit-tdd-guard.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/pre-edit-reuse-guard.sh"
           }
         ]
       }
@@ -139,6 +153,18 @@
           {
             "type": "command",
             "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/auto-review.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/auto-qa-review.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/auto-po-review.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/.claude/hooks/auto-refactor-check.sh"
           },
           {
             "type": "command",
