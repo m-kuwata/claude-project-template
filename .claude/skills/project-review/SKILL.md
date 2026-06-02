@@ -50,5 +50,8 @@ npm run lint          # Lint クリーン
 全ステップ通過後、Stop フックのブロックを解除するためにマーカーを置く。
 
 ```bash
-touch /tmp/project-review-passed
+bash $CLAUDE_PROJECT_DIR/.claude/hooks/mark-review-passed.sh project-review
 ```
+
+`touch /tmp/${PROJECT_NAME}-project-review-passed` は deny リストで禁止されています。
+このスクリプトを経由することで、Stop フックがスキルを正規に実行したことを検証できます。

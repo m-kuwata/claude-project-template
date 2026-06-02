@@ -85,10 +85,18 @@
 | `issue-progress` | GitHub Projects 進捗管理 |
 | `tdd` | TDD ワークフロー（Red→Green→Refactor） |
 | `project-review` | コミット前チェックリスト（テスト・型・デザイン・セキュリティ） |
+| `refactor` | リファクタゲート（重複・dead code・再利用・複雑度） |
+| `qa-review` | テストシナリオが実運用に沿っているか QA 視点でレビュー |
+| `po-review` | 機能・実装が現場の運用ニーズと合っているか PO 視点でレビュー |
 | `design-system` | デザインシステム規約クイックリファレンス |
 | `coverage-check` | カバレッジ確認・未テストパスへのテスト追加 |
 | `config-audit` | Claude 設定ファイルの健全性チェック |
 | [追加スキル] | [用途] |
+
+> **実装完了後のレビューゲート**: 実装ファイル（`.ts`/`.tsx`/`.py`）を変更すると、
+> Stop フックが `/project-review`・`/qa-review`・`/po-review`・`/refactor` を要求する。
+> 各スキル完了後は `bash .claude/hooks/mark-review-passed.sh <スキル名>` で記録する
+> （`touch` では記録できない＝レビュースキップを構造的に防止）。
 
 ## 関連リソース
 

@@ -17,13 +17,19 @@ while IFS= read -r file; do
   if echo "$file" | grep -qE '\.(tsx?|ts)$' && \
      ! echo "$file" | grep -qE '\.(test|spec|stories)\.(tsx?|ts)$' && \
      ! echo "$file" | grep -qE '(vitest|playwright|tailwind|next|postcss)\.config'; then
-    touch "/tmp/${PROJECT_NAME}-needs-review"
+    touch "/tmp/${PROJECT_NAME}-needs-review" \
+          "/tmp/${PROJECT_NAME}-needs-qa-review" \
+          "/tmp/${PROJECT_NAME}-needs-po-review" \
+          "/tmp/${PROJECT_NAME}-needs-refactor"
     break
   fi
   # .py 実装ファイル（テスト・conftest を除く）
   if echo "$file" | grep -qE '\.py$' && \
      ! echo "$file" | grep -qE '(test_.*|.*_test|conftest)\.py$'; then
-    touch "/tmp/${PROJECT_NAME}-needs-review"
+    touch "/tmp/${PROJECT_NAME}-needs-review" \
+          "/tmp/${PROJECT_NAME}-needs-qa-review" \
+          "/tmp/${PROJECT_NAME}-needs-po-review" \
+          "/tmp/${PROJECT_NAME}-needs-refactor"
     break
   fi
 done <<< "$files"
