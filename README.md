@@ -148,7 +148,7 @@ flowchart LR
         E --> G[/qa-review 実行]
         E --> H[/po-review 実行]
         E --> I[/refactor 実行]
-        F & G & H & I --> J[mark-review-passed.sh\n各スキル名を引数で呼ぶ]
+        F & G & H & I --> J["mark-review-passed.sh<br/>各スキル名を引数で呼ぶ"]
         J --> K["/tmp/PROJECT-*-passed\nREVIEWED:タイムスタンプ を書き込み\n（touch では書けない形式）"]
     end
 
