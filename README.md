@@ -28,13 +28,13 @@ flowchart TD
     subgraph HUMAN["👤 人間がやること"]
         H1["タスクの内容・優先度を決める"]
         H2["'/issue-pm create' と指示する"]
-        H5["echo '#N' > /tmp/PROJECT-issue-acked\n（着手確認マーカーをセット）"]
         H8["PR の内容を確認してマージする"]
     end
 
     subgraph CLAUDE["🤖 Claude がやること"]
         C1["Issue 本文・受け入れ条件を起草して作成"]
         C2["feat/N-slug ブランチを切る"]
+        H5["echo '#N' > /tmp/PROJECT-issue-acked\n（着手確認マーカーをセット）"]
         C3["/tdd でテストを先に書く（RED）"]
         C4["実装する（GREEN）"]
         C5["/refactor で重複・未使用コード を整理"]
@@ -77,8 +77,8 @@ flowchart TD
 
 | 役割 | 担当 | 具体的な作業 |
 |---|---|---|
-| **👤 人間** | 意思決定・方向づけ | タスクの内容と優先度を決める・着手確認マーカーをセット・PR をマージする |
-| **🤖 Claude** | 実装作業全般 | Issue 作成・ブランチ切り・テスト記述・実装・コミット・レビュー・PR 作成 |
+| **👤 人間** | 意思決定・方向づけ | タスクの内容と優先度を決める・PR をマージする |
+| **🤖 Claude** | 実装作業全般 | Issue 作成・ブランチ切り・着手確認マーカーをセット・テスト記述・実装・コミット・レビュー・PR 作成 |
 | **⚙️ フック** | ルール強制・自動チェック | TDD 遵守・Issue 紐付け・品質ゲート・レビュー強制（Claude をブロックする） |
 
 > **キーポイント**: 人間がやることは「何を作るか」の判断と最終承認のみ。  
@@ -135,7 +135,7 @@ sequenceDiagram
 flowchart LR
     subgraph PostToolUse
         A[実装ファイル変更] --> B[set-impl-flag.sh]
-        B --> C[/tmp/PROJECT-needs-review\n/tmp/PROJECT-needs-qa-review\n/tmp/PROJECT-needs-po-review\n/tmp/PROJECT-needs-refactor]
+        B --> C["/tmp/PROJECT-needs-review<br/>/tmp/PROJECT-needs-qa-review<br/>/tmp/PROJECT-needs-po-review<br/>/tmp/PROJECT-needs-refactor"]
     end
 
     subgraph Stop Hook
