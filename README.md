@@ -21,64 +21,108 @@ TDD・Issue 駆動開発・多段レビューゲートを **Claude が自律的�
 
 ---
 
-## 開発フロー全体図
+## 開発フロー全体図（人間 vs Claude vs 自動フック）
 
 ```mermaid
 flowchart TD
-    A[新しいタスク発生] --> B[/issue-pm create/]
-    B --> C[GitHub Issue 作成]
-    C --> D[feat/N-slug ブランチ作成]
-    D --> E["echo '#N' > /tmp/PROJECT-issue-acked"]
-    E --> F[/tdd でテスト先行作成 RED]
-    F --> G{テスト存在チェック\npre-edit-tdd-guard.sh}
-    G -- テストなし --> H[ブロック: テストを先に書け]
-    G -- テストあり --> I[実装 GREEN]
-    I --> J[/refactor リファクタ]
-    J --> K[git commit]
-    K --> L{コミット前品質ゲート\npre-commit-check.sh}
-    L -- 失敗 --> M[ブロック: テスト/型/カバレッジ修正]
-    L -- 通過 --> N[Claude 応答終了]
-    N --> O{Stop フック: 実装フラグ検知}
-    O -- フラグあり --> P[/project-review 実行]
-    P --> Q[/qa-review 実行]
-    Q --> R[/po-review 実行]
-    R --> S[/refactor 実行]
-    S --> T[mark-review-passed.sh で全完了記録]
-    T --> U[/issue-pm finish N でPR作成]
-    O -- フラグなし --> V[完了]
+    subgraph HUMAN["👤 人間がやること"]
+        H1["タスクの内容・優先度を決める"]
+        H2["'/issue-pm create' と指示する"]
+        H5["echo '#N' > /tmp/PROJECT-issue-acked\n（Issue ACK マーカーをセット）"]
+        H8["PR の内容を確認してマージする"]
+    end
+
+    subgraph CLAUDE["🤖 Claude がやること"]
+        C1["Issue 本文・受け入れ条件を起草して作成"]
+        C2["feat/N-slug ブランチを切る"]
+        C3["/tdd でテストを先に書く（RED）"]
+        C4["実装する（GREEN）"]
+        C5["/refactor で重複・dead code を整理"]
+        C6["git commit（#N を含むメッセージで）"]
+        C7["/project-review → /qa-review → /po-review"]
+        C8["/issue-pm finish N で PR を作成"]
+    end
+
+    subgraph HOOKS["⚙️ フックが自動でやること"]
+        F1{"pre-edit-issue-guard\nIssue ACK チェック"}
+        F2{"pre-edit-tdd-guard\nテスト存在チェック"}
+        F3{"pre-commit-check\nテスト・型・カバレッジ"}
+        F4{"Stop フック\n実装フラグ検知"}
+        F5["各レビュースキルの\n完了を強制（ブロック）"]
+    end
+
+    H1 --> H2
+    H2 --> C1
+    C1 --> C2
+    C2 --> H5
+    H5 --> C3
+    C3 --> F1
+    F1 -- ACK なし --> ERR1["❌ ブロック"]
+    F1 -- ACK あり --> F2
+    F2 -- テストなし --> ERR2["❌ ブロック: テストを先に書け"]
+    F2 -- テストあり --> C4
+    C4 --> C5
+    C5 --> C6
+    C6 --> F3
+    F3 -- 失敗 --> ERR3["❌ ブロック: 品質基準を満たせ"]
+    F3 -- 通過 --> F4
+    F4 -- フラグなし --> DONE["✅ 完了"]
+    F4 -- フラグあり --> F5
+    F5 --> C7
+    C7 --> C8
+    C8 --> H8
 ```
+
+### 人間・Claude・フックの役割分担
+
+| 役割 | 担当 | 具体的な作業 |
+|---|---|---|
+| **👤 人間** | 意思決定・方向づけ | タスクの内容と優先度を決める・Issue ACK マーカーをセット・PR をマージする |
+| **🤖 Claude** | 実装作業全般 | Issue 作成・ブランチ切り・テスト記述・実装・コミット・レビュー・PR 作成 |
+| **⚙️ フック** | ルール強制・自動チェック | TDD 遵守・Issue 紐付け・品質ゲート・レビュー強制（Claude をブロックする） |
+
+> **キーポイント**: 人間がやることは「何を作るか」の判断と最終承認のみ。  
+> Claude が「どう作るか」を実行し、フックが Claude のルール逸脱を機械的に防ぎます。
 
 ---
 
-## フック ライフサイクル
+## フック ライフサイクル（1 ターンの詳細）
 
 ```mermaid
 sequenceDiagram
-    participant U as ユーザー
-    participant C as Claude
-    participant H as フック
+    actor Human as 👤 人間
+    participant Claude as 🤖 Claude
+    participant Hook as ⚙️ フック（自動）
+    participant GitHub as GitHub
 
-    U->>C: プロンプト送信
-    H->>C: UserPromptSubmit: tdd-reminder.sh<br/>（実装キーワード検出時にリマインダー注入）
+    Human->>Claude: 「〇〇を実装して」とプロンプト送信
+    Hook->>Claude: [自動] tdd-reminder.sh<br/>実装キーワード検出 → Issue+TDD リマインダーを注入
 
-    C->>H: ファイル編集 (Edit/Write)
-    H-->>C: PreToolUse: pre-edit-issue-guard.sh<br/>（Issue ACK マーカーチェック）
-    H-->>C: PreToolUse: pre-edit-tdd-guard.sh<br/>（対応テストの存在チェック）
-    H-->>C: PreToolUse: pre-edit-reuse-guard.sh<br/>（既存コンポーネント警告）
-    H->>C: PostToolUse: set-impl-flag.sh<br/>（実装フラグ立て）
-    H->>C: PostToolUse: set-screen-flag.sh<br/>（画面フラグ立て）
-    H->>C: PostToolUse: post-edit-lint.sh<br/>（ESLint 即時実行）
+    Note over Claude: Issue ACK マーカーを確認
+    Claude->>Hook: ファイルを編集しようとする
+    Hook-->>Claude: [ブロック可] pre-edit-issue-guard.sh<br/>ACK マーカー /tmp/PROJECT-issue-acked がなければ拒否
+    Hook-->>Claude: [ブロック可] pre-edit-tdd-guard.sh<br/>対応テストファイルがなければ拒否
+    Hook-->>Claude: [警告] pre-edit-reuse-guard.sh<br/>類似コンポーネントが存在したら警告
 
-    C->>H: git commit
-    H-->>C: PreToolUse(Bash): pre-commit-check.sh<br/>（テスト・型・カバレッジ・ブランチ名検証）
+    Note over Claude: テスト → 実装 → リファクタ を繰り返す
+    Hook->>Claude: [自動] set-impl-flag.sh<br/>/tmp/PROJECT-needs-review フラグを立てる
+    Hook->>Claude: [自動] post-edit-lint.sh<br/>ESLint を即時実行（非ブロック）
 
-    C->>U: 応答完了（Stop イベント）
-    H-->>C: Stop: auto-review.sh → /project-review 要求
-    H-->>C: Stop: auto-qa-review.sh → /qa-review 要求
-    H-->>C: Stop: auto-po-review.sh → /po-review 要求
-    H-->>C: Stop: auto-refactor-check.sh → /refactor 要求
-    H-->>C: Stop: auto-design-check.sh → /design-check 要求
-    H-->>C: Stop: auto-screenshot-check.sh → スクリーンショット確認要求
+    Claude->>Hook: git commit を実行
+    Hook-->>Claude: [ブロック可] pre-commit-check.sh<br/>テスト失敗 / 型エラー / カバレッジ不足 / ブランチ名不正 → 拒否
+
+    Claude->>Human: 応答完了（Stop イベント発生）
+    Hook-->>Claude: [ブロック] auto-review.sh → /project-review スキルを要求
+    Hook-->>Claude: [ブロック] auto-qa-review.sh → /qa-review スキルを要求
+    Hook-->>Claude: [ブロック] auto-po-review.sh → /po-review スキルを要求
+    Hook-->>Claude: [ブロック] auto-refactor-check.sh → /refactor スキルを要求
+
+    Note over Claude: 各スキルを順に実行
+    Claude->>Hook: mark-review-passed.sh project-review<br/>mark-review-passed.sh qa-review ... を呼ぶ
+    Hook->>Hook: REVIEWED:タイムスタンプ を検証してフラグ解除
+
+    Claude->>GitHub: PR を作成（Closes #N）
+    Human->>GitHub: PR を確認してマージ
 ```
 
 ---
